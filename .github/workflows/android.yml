@@ -1,0 +1,66 @@
+name: Build AstraMind APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AstraMind
+        uses: actions/checkout@v4
+
+      - name: Unpack Android project
+        run: |
+          test -f AstraMind-Android-Starter.zip || {
+            echo "AstraMind-Android-Starter.zip is missing from repository root"
+            exit 1
+          }
+          unzip -o AstraMind-Android-Starter.zip -d .
+          test -f app/build.gradle.kts
+          test -f app/src/main/cpp/CMakeLists.txt
+          test -f app/src/main/cpp/native-lib.cpp
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # GitHub-hosted Ubuntu runners already include Android command-line tools.
+      # Avoid setup-android@v3 here: the previous run failed while requesting
+      # the obsolete SDK package "tools".
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018" \
+            "cmake;3.22.1"
+
+      - name: Download llama.cpp
+        run: |
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git \
+            app/src/main/cpp/llama.cpp
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Build debug APK
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstraMind-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
