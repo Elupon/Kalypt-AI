@@ -1,2 +1,2 @@
-# AstraMind
-AstraMind AI By ELUPON
+# Kalypt
+Kalypt AI By ELUPON
